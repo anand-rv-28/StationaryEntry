@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stockledger — Inventory CRUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F7F5F1;
+    --surface:#FFFFFF;
+    --surface-2:#FBFAF7;
+    --ink:#1F2A28;
+    --ink-soft:#5B685F;
+    --ink-faint:#8B968F;
+    --accent:#2F6F62;
+    --accent-ink:#164039;
+    --accent-soft:#E4EFE9;
+    --amber:#C97A2A;
+    --amber-soft:#FBEBD9;
+    --red:#B14239;
+    --red-soft:#F8E2DF;
+    --border:#E4E0D8;
+    --border-strong:#D3CDC0;
+    --shadow: 0 1px 2px rgba(31,42,40,.04), 0 6px 20px rgba(31,42,40,.06);
+    --radius: 10px;
+  }
+  html[data-theme="dark"]{
+    --bg:#141A18;
+    --surface:#1B2320;
+    --surface-2:#202925;
+    --ink:#ECEAE3;
+    --ink-soft:#AFB8B1;
+    --ink-faint:#727C76;
+    --accent:#5FAF9B;
+    --accent-ink:#BFE6D9;
+    --accent-soft:#213330;
+    --amber:#E0A458;
+    --amber-soft:#3A2E1E;
+    --red:#E08178;
+    --red-soft:#3A211F;
+    --border:#2B332F;
+    --border-strong:#38423C;
+    --shadow: 0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;transition:background .2s ease,color .2s ease;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Barlow Condensed',sans-serif;}
+
+  .wrap{max-width:1400px;margin:28px auto;padding:0 20px 60px;}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .header{
+    background:linear-gradient(135deg,var(--accent-ink) 0%,var(--accent) 100%);
+    color:#F3F7F5;
+    border-radius:var(--radius) var(--radius) 0 0;
+    padding:26px 28px;
+    display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;
+  }
+  html[data-theme="dark"] .header{background:linear-gradient(135deg,#0F1A17 0%, #1E463D 100%);}
+  .header-left h1{
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;letter-spacing:.3px;margin:0 0 4px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .header-left h1 .tag{
+    font-size:11px;letter-spacing:1.5px;text-transform:uppercase;background:rgba(255,255,255,.14);
+    padding:3px 8px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-weight:500;
+  }
+  .header-left .sub{font-size:13px;opacity:.82;margin:0;}
+  .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .chip{
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;
+    padding:7px 12px;border-radius:99px;font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:6px;
+    white-space:nowrap;
+  }
+  .chip b{font-family:'JetBrains Mono',monospace;font-weight:600;}
+  .chip.sync{background:rgba(120,220,180,.18);border-color:rgba(120,220,180,.4);}
+
+  .theme-toggle{
+    width:42px;height:24px;border-radius:99px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+    position:relative;cursor:pointer;flex-shrink:0;
+  }
+  .theme-toggle .knob{
+    position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;
+    transition:transform .18s ease;display:flex;align-items:center;justify-content:center;font-size:10px;
+  }
+  html[data-theme="dark"] .theme-toggle .knob{transform:translateX(18px);}
+
+  .toolbar{
+    display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:16px 28px;border-bottom:1px solid var(--border);
+  }
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btn{
+    border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);
+    padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;gap:7px;transition:all .12s ease;font-family:'Inter',sans-serif;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff;}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--ink-soft);}
+  .btn-ghost:hover{background:var(--surface-2);color:var(--ink);border-color:var(--border);}
+  .btn-danger{color:var(--red);}
+  .btn-danger:hover{background:var(--red-soft);border-color:var(--red);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none;}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  input[type="file"]{display:none;}
+
+  .search-box{
+    display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:8px;padding:8px 12px;min-width:230px;
+  }
+  .search-box input{border:none;background:transparent;outline:none;font-size:13.5px;color:var(--ink);width:100%;font-family:'Inter',sans-serif;}
+  .search-box svg{flex-shrink:0;opacity:.55;}
+
+  .sync-note{
+    font-size:12px;color:var(--ink-faint);padding:0 28px 14px;margin-top:-4px;
+  }
+  .sync-note.live{color:var(--accent-ink);font-weight:600;}
+
+  .reconnect-bar{
+    display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:12px 28px;background:var(--amber-soft);border-bottom:1px solid var(--border);font-size:13px;color:var(--ink);
+  }
+  .reconnect-bar.show{display:flex;}
+
+  .filters{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 28px;background:var(--surface-2);
+    border-bottom:1px solid var(--border);
+  }
+  .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);font-weight:600;margin-right:5px;}
+  select, .field input, .field select{
+    border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);border-radius:7px;
+    padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;
+  }
+  select:focus, .field input:focus, .field select:focus{border-color:var(--accent);}
+  .reset-link{font-size:12.5px;color:var(--accent-ink);cursor:pointer;font-weight:600;background:none;border:none;text-decoration:underline;}
+
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;min-width:1120px;}
+  thead th{
+    position:sticky;top:0;background:var(--surface);z-index:2;text-align:left;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);font-weight:700;
+    padding:12px 14px;border-bottom:2px solid var(--border-strong);cursor:pointer;white-space:nowrap;user-select:none;
+  }
+  thead th:hover{color:var(--accent-ink);}
+  thead th .arrow{opacity:.4;font-size:10px;margin-left:3px;}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13.5px;white-space:nowrap;}
+  tbody tr:hover{background:var(--surface-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.zero-row{background:var(--red-soft);}
+  td.num, th.num{text-align:right;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+  td.code{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent-ink);}
+  td.actions{text-align:right;}
+  .icon-btn{
+    border:none;background:none;cursor:pointer;padding:5px 7px;border-radius:6px;color:var(--ink-faint);
+    display:inline-flex;align-items:center;
+  }
+  .icon-btn:hover{background:var(--accent-soft);color:var(--accent-ink);}
+  .icon-btn.del:hover{background:var(--red-soft);color:var(--red);}
+
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:600;
+    font-family:'Inter',sans-serif;white-space:nowrap;
+  }
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%;}
+  .badge.ok{background:var(--accent-soft);color:var(--accent-ink);}
+  .badge.ok::before{background:var(--accent);}
+  .badge.low{background:var(--amber-soft);color:var(--amber);}
+  .badge.low::before{background:var(--amber);}
+  .badge.out{background:var(--red-soft);color:var(--red);}
+  .badge.out::before{background:var(--red);}
+
+  .empty{padding:70px 30px;text-align:center;color:var(--ink-faint);}
+  .empty .display{font-size:26px;color:var(--ink);margin-bottom:6px;}
+  .empty p{font-size:13.5px;margin:0 0 18px;}
+  .empty .btn-row{justify-content:center;}
+
+  .footer-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 28px;font-size:12.5px;color:var(--ink-faint);flex-wrap:wrap;gap:8px;}
+
+  .overlay{
+    position:fixed;inset:0;background:rgba(20,26,24,.5);display:none;align-items:flex-start;justify-content:center;
+    padding:40px 16px;overflow-y:auto;z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--surface);border-radius:12px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    border:1px solid var(--border);
+  }
+  .modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h2{font-family:'Barlow Condensed',sans-serif;font-size:22px;margin:0;font-weight:700;}
+  .modal-head button{border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink-faint);line-height:1;}
+  .modal-body{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.span2{grid-column:1/-1;}
+  .field label{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);font-weight:700;}
+  .field input, .field select{width:100%;}
+  .field .hint{font-size:11px;color:var(--ink-faint);font-weight:400;text-transform:none;letter-spacing:0;}
+  .modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+
+  .warn-modal{max-width:460px;border-top:4px solid var(--red);}
+  .warn-modal .modal-head{align-items:flex-start;}
+  .warn-icon{
+    width:38px;height:38px;border-radius:50%;background:var(--red-soft);color:var(--red);
+    display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;margin-right:12px;
+  }
+  .warn-title-row{display:flex;align-items:center;}
+  .warn-body{padding:6px 24px 20px;font-size:13.5px;color:var(--ink-soft);}
+  .warn-body ul{margin:10px 0 0;padding-left:18px;}
+  .warn-body li{margin-bottom:6px;}
+  .warn-body li span.mono{color:var(--ink-faint);font-size:12px;}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--ink);color:var(--bg);
+    padding:11px 20px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:all .2s ease;z-index:80;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:80vw;
+  }
+  html[data-theme="dark"] .toast{background:var(--accent);color:#0f1a17;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:640px){
+    .modal-body{grid-template-columns:1fr;}
+    .header{padding:20px;}
+    .toolbar,.filters,.footer-bar,.sync-note,.reconnect-bar{padding-left:18px;padding-right:18px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="panel">
+
+    <div class="header">
+      <div class="header-left">
+        <h1>StationaryEntry<span class="tag">Excel CRUD</span></h1>
+        <p class="sub" id="lastUpdated">No file loaded yet</p>
+      </div>
+      <div class="header-right">
+        <div class="chip sync" id="syncChip" style="display:none;">🟢 Live-synced</div>
+        <div class="chip">Rows&nbsp;<b id="rowCount">0</b></div>
+        <div class="chip">Columns&nbsp;<b>11</b></div>
+        <div class="theme-toggle" id="themeToggle" title="Toggle theme"><div class="knob">☀</div></div>
+      </div>
+    </div>
+
+    <div class="reconnect-bar" id="reconnectBar">
+      <span>📄 You had "<b id="reconnectName"></b>" linked last time — your data below was restored from local storage, but auto-save to that file needs to be reconnected.</span>
+      <button class="btn btn-primary small" id="reconnectBtn">🔗 Reconnect file</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="btn-row" id="linkedControls">
+        <button class="btn btn-primary" id="linkOpenBtn">🔗 Link Excel File</button>
+        <button class="btn" id="linkNewBtn">＋ Create linked Excel</button>
+        <button class="btn btn-ghost" id="unlinkBtn" style="display:none;">Unlink</button>
+        <label class="btn btn-ghost" for="fileInput" id="oneTimeLabel">Import (one-time)</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        <button class="btn" id="exportBtn">⭳ Export copy</button>
+        <button class="btn" id="addBtn">+ Add Item</button>
+        <button class="btn btn-ghost" id="sampleBtn" disabled></button>
+      </div>
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search all columns…">
+      </div>
+    </div>
+    <div class="sync-note" id="syncNote">Checking browser support for live Excel syncing…</div>
+
+    <div class="filters">
+      <label>Brand</label>
+      <select id="filterBrand"><option>All</option></select>
+      <label>Stock alert</label>
+      <select id="filterAlert">
+        <option>All</option><option>In Stock</option><option>Low Stock</option><option>Out of Stock</option>
+      </select>
+      <button class="reset-link" id="resetFilters">Reset filters</button>
+    </div>
+
+    <div id="tableArea">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr id="headRow"></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" style="display:none;">
+        <div class="display">No items yet</div>
+        <p>Link an Excel file, add an item manually, or load sample data to get started.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="emptyLinkBtn">🔗 Link Excel File</button>
+          <button class="btn" id="emptyAddBtn">+ Add Item</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <span id="footerCount">Showing 0 of 0 items</span>
+      <span id="footerHint">Data is stored only in this browser tab until you export.</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Add item</h2>
+      <button id="modalClose">✕</button>
+    </div>
+    <form id="itemForm">
+      <div class="modal-body">
+        <div class="field"><label>Item code *</label><input type="text" id="f_itemcode" required></div>
+        <div class="field"><label>Item name *</label><input type="text" id="f_itemname" required></div>
+        <div class="field"><label>Brand</label><input type="text" id="f_brand"></div>
+        <div class="field"><label>Size / Type (note)</label><input type="text" id="f_sizeType"></div>
+        <div class="field"><label>Open stock</label><input type="number" step="any" id="f_openStock"></div>
+        <div class="field"><label>Stock balance</label><input type="number" step="any" id="f_stockBalance"></div>
+        <div class="field"><label>Quantity</label><input type="number" step="any" id="f_quantity"></div>
+        <div class="field"><label>Rate</label><input type="number" step="any" id="f_rate"></div>
+        <div class="field"><label>Price</label><input type="number" step="any" id="f_price"></div>
+        <div class="field">
+          <label>Stock alert (warning)</label>
+          <select id="f_stockAlert">
+            <option value="Auto">Auto (based on stock balance)</option>
+            <option value="In Stock">In Stock</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
+        </div>
+        <div class="field span2">
+          <label>Date and time</label>
+          <input type="datetime-local" id="f_dateTime">
+          <span class="hint">Auto-filled on save if left blank.</span>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Out-of-stock warning modal -->
+<div class="overlay" id="warnOverlay">
+  <div class="modal warn-modal">
+    <div class="modal-head">
+      <div class="warn-title-row">
+        <div class="warn-icon">!</div>
+        <h2>Out of stock warning</h2>
+      </div>
+      <button id="warnClose">✕</button>
+    </div>
+    <div class="warn-body">
+      <span id="warnIntro">The following item has hit zero stock:</span>
+      <ul id="warnList"></ul>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" id="warnFilterBtn">Show out-of-stock items</button>
+      <button type="button" class="btn btn-primary" id="warnOk">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Field schema (drives table, form and Excel headers) ----------
+  var FIELDS = [
+    { key:'itemcode',     label:'Item Code',            excel:'itemcode',                 type:'text',  code:true },
+    { key:'itemname',     label:'Item Name',             excel:'itemname',                 type:'text' },
+    { key:'brand',        label:'Brand',                 excel:'brand',                    type:'text' },
+    { key:'sizeType',     label:'Size/Type (Note)',      excel:'size/type(note)',          type:'text' },
+    { key:'openStock',    label:'Open Stock',            excel:'openstock',                type:'number' },
+    { key:'stockBalance', label:'Stock Balance',         excel:'stockbalance',             type:'number' },
+    { key:'quantity',     label:'Quantity',              excel:'quantity',                 type:'number' },
+    { key:'rate',         label:'Rate',                  excel:'rate',                     type:'number' },
+    { key:'price',        label:'Price',                 excel:'price',                    type:'number' },
+    { key:'stockAlert',   label:'Stock Alert',           excel:'stock alert (warning)',    type:'badge' },
+    { key:'dateTime',     label:'Date and Time',         excel:'Date and time',            type:'datetime' }
+  ];
+
+  function normHeader(h){
+    return String(h||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  }
+  var HEADER_LOOKUP = {};
+  FIELDS.forEach(function(f){ HEADER_LOOKUP[normHeader(f.excel)] = f.key; });
+  HEADER_LOOKUP[normHeader('sizetype')] = 'sizeType';
+  HEADER_LOOKUP[normHeader('size')] = 'sizeType';
+  HEADER_LOOKUP[normHeader('stockalert')] = 'stockAlert';
+  HEADER_LOOKUP[normHeader('datetime')] = 'dateTime';
+  HEADER_LOOKUP[normHeader('date')] = 'dateTime';
+
+  // ---------- State ----------
+  var items = [];
+  var editingId = null;
+  var sortKey = null, sortDir = 1;
+  var lastFileName = null;
+  var fileHandle = null; // FileSystemFileHandle when a file is "linked" for live auto-save
+  var fsSupported = ('showOpenFilePicker' in window) && ('showSaveFilePicker' in window);
+
+  var els = {
+    headRow: document.getElementById('headRow'),
+    tbody: document.getElementById('tbody'),
+    empty: document.getElementById('emptyState'),
+    rowCount: document.getElementById('rowCount'),
+    lastUpdated: document.getElementById('lastUpdated'),
+    footerCount: document.getElementById('footerCount'),
+    footerHint: document.getElementById('footerHint'),
+    search: document.getElementById('searchInput'),
+    filterBrand: document.getElementById('filterBrand'),
+    filterAlert: document.getElementById('filterAlert'),
+    overlay: document.getElementById('overlay'),
+    modalTitle: document.getElementById('modalTitle'),
+    form: document.getElementById('itemForm'),
+    toast: document.getElementById('toast'),
+    syncChip: document.getElementById('syncChip'),
+    syncNote: document.getElementById('syncNote'),
+    warnOverlay: document.getElementById('warnOverlay'),
+    warnList: document.getElementById('warnList'),
+    warnIntro: document.getElementById('warnIntro'),
+    reconnectBar: document.getElementById('reconnectBar'),
+    reconnectName: document.getElementById('reconnectName')
+  };
+
+  function uid(){ return 'it_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  function computeAlert(stockBalance){
+    var n = Number(stockBalance);
+    if (isNaN(n)) return 'In Stock';
+    if (n <= 0) return 'Out of Stock';
+    if (n <= 10) return 'Low Stock';
+    return 'In Stock';
+  }
+
+  function nowLocalInputValue(){
+    var d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,16);
+  }
+
+  function formatDisplayDate(v){
+    if(!v) return '—';
+    var d = new Date(v);
+    if(isNaN(d.getTime())) return String(v);
+    return d.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  }
+
+  function toast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ els.toast.classList.remove('show'); }, 2400);
+  }
+
+  // ---------- Sync status UI ----------
+  function setSyncStatus(on, name){
+    if(on){
+      els.syncChip.style.display = 'inline-flex';
+      els.syncChip.innerHTML = '🟢 Live-synced';
+      document.getElementById('unlinkBtn').style.display = 'inline-flex';
+      document.getElementById('linkOpenBtn').style.display = 'none';
+      document.getElementById('linkNewBtn').style.display = 'none';
+      els.syncNote.textContent = 'Linked to "' + name + '" — every add, edit and delete is written straight back to this Excel file automatically.';
+      els.syncNote.classList.add('live');
+      els.footerHint.textContent = 'Auto-saving every change to "' + name + '".';
+    } else {
+      els.syncChip.style.display = 'none';
+      document.getElementById('unlinkBtn').style.display = 'none';
+      document.getElementById('linkOpenBtn').style.display = 'inline-flex';
+      document.getElementById('linkNewBtn').style.display = 'inline-flex';
+      els.syncNote.classList.remove('live');
+      if(fsSupported){
+        els.syncNote.textContent = 'Not linked — click "Link Excel File" to auto-save every change directly to a real .xlsx file, or use Import/Export manually. Your data is still saved automatically in this browser, so refreshing is safe.';
+      } else {
+        els.syncNote.textContent = 'Your browser does not support live-saving to a local file (this needs Chrome or Edge). Your data is still saved automatically in this browser (refreshing is safe) — use Import + Export Copy to move data to a real Excel file.';
+      }
+      els.footerHint.textContent = 'Data is auto-saved in this browser and will still be here after a refresh.';
+    }
+  }
+
+  // ---------- Rendering ----------
+  function buildHead(){
+    var html = '';
+    FIELDS.forEach(function(f){
+      var alignNum = (f.type==='number') ? ' num' : '';
+      var arrow = sortKey===f.key ? (sortDir===1?'▲':'▼') : '';
+      html += '<th class="'+alignNum.trim()+'" data-key="'+f.key+'">'+f.label+' <span class="arrow">'+arrow+'</span></th>';
+    });
+    html += '<th style="text-align:right;">Actions</th>';
+    els.headRow.innerHTML = html;
+    Array.prototype.forEach.call(els.headRow.querySelectorAll('th[data-key]'), function(th){
+      th.addEventListener('click', function(){
+        var key = th.getAttribute('data-key');
+        if(sortKey===key){ sortDir *= -1; } else { sortKey = key; sortDir = 1; }
+        render();
+      });
+    });
+  }
+
+  function getFiltered(){
+    var q = els.search.value.trim().toLowerCase();
+    var brand = els.filterBrand.value;
+    var alert = els.filterAlert.value;
+    return items.filter(function(it){
+      if(brand!=='All' && (it.brand||'') !== brand) return false;
+      if(alert!=='All' && displayAlert(it) !== alert) return false;
+      if(!q) return true;
+      return FIELDS.some(function(f){
+        return String(it[f.key]==null?'':it[f.key]).toLowerCase().indexOf(q) !== -1;
+      });
+    });
+  }
+
+  function getSorted(list){
+    if(!sortKey) return list;
+    var f = FIELDS.filter(function(x){return x.key===sortKey;})[0];
+    var isNum = f && f.type==='number';
+    return list.slice().sort(function(a,b){
+      var av=a[sortKey], bv=b[sortKey];
+      if(isNum){ av=Number(av)||0; bv=Number(bv)||0; return (av-bv)*sortDir; }
+      av=String(av==null?'':av).toLowerCase(); bv=String(bv==null?'':bv).toLowerCase();
+      if(av<bv) return -1*sortDir; if(av>bv) return 1*sortDir; return 0;
+    });
+  }
+
+  function badgeClass(alert){
+    if(alert==='Out of Stock') return 'out';
+    if(alert==='Low Stock') return 'low';
+    return 'ok';
+  }
+
+  // The alert that should actually be SHOWN for an item. If the item was
+  // manually overridden through the edit form (alertOverride === true) we
+  // respect that. Otherwise we always recompute it live from the current
+  // stock balance, rather than trusting whatever text happened to be
+  // sitting in an imported Excel file's "Stock Alert" column — that text
+  // can go stale (e.g. balance edited elsewhere) and used to be shown as-is.
+  function displayAlert(it){
+    if(it.alertOverride) return it.stockAlert;
+    return computeAlert(it.stockBalance);
+  }
+
+  function render(){
+    buildHead();
+    var filtered = getSorted(getFiltered());
+
+    els.tbody.innerHTML = '';
+    filtered.forEach(function(it){
+      var tr = document.createElement('tr');
+      if(Number(it.stockBalance) <= 0) tr.classList.add('zero-row');
+      var cells = '';
+      FIELDS.forEach(function(f){
+        var val = it[f.key];
+        if(f.type==='number'){
+          cells += '<td class="num">'+ (val===''||val==null ? '—' : Number(val).toLocaleString()) +'</td>';
+        } else if(f.type==='badge'){
+          var shown = displayAlert(it);
+          cells += '<td><span class="badge '+badgeClass(shown)+'">'+shown+'</span></td>';
+        } else if(f.type==='datetime'){
+          cells += '<td>'+formatDisplayDate(val)+'</td>';
+        } else if(f.code){
+          cells += '<td class="code">'+(val||'—')+'</td>';
+        } else {
+          cells += '<td>'+(val==null||val==='' ? '—' : val)+'</td>';
+        }
+      });
+      cells += '<td class="actions">'+
+        '<button class="icon-btn edit" title="Edit" data-id="'+it.id+'">✎</button>'+
+        '<button class="icon-btn del" title="Delete" data-id="'+it.id+'">🗑</button>'+
+        '</td>';
+      tr.innerHTML = cells;
+      els.tbody.appendChild(tr);
+    });
+
+    Array.prototype.forEach.call(els.tbody.querySelectorAll('.icon-btn.edit'), function(b){
+      b.addEventListener('click', function(){ openModal(b.getAttribute('data-id')); });
+    });
+    Array.prototype.forEach.call(els.tbody.querySelectorAll('.icon-btn.del'), function(b){
+      b.addEventListener('click', function(){ deleteItem(b.getAttribute('data-id')); });
+    });
+
+    els.empty.style.display = items.length===0 ? 'block' : 'none';
+    document.querySelector('.table-scroll').style.display = items.length===0 ? 'none' : 'block';
+
+    els.rowCount.textContent = items.length;
+    els.footerCount.textContent = 'Showing ' + filtered.length + ' of ' + items.length + ' items';
+
+    populateBrandFilter();
+  }
+
+  function populateBrandFilter(){
+    var current = els.filterBrand.value;
+    var brands = Array.from(new Set(items.map(function(it){return it.brand;}).filter(Boolean))).sort();
+    els.filterBrand.innerHTML = '<option>All</option>' + brands.map(function(b){return '<option>'+b+'</option>';}).join('');
+    if(brands.indexOf(current)!==-1) els.filterBrand.value = current;
+  }
+
+  function setLastUpdated(text){
+    els.lastUpdated.textContent = text;
+  }
+
+  // ---------- Out-of-stock warning dialog ----------
+  function showOutOfStockWarning(list){
+    if(!list || list.length===0) return;
+    els.warnIntro.textContent = list.length===1
+      ? 'The following item has hit zero stock:'
+      : list.length + ' items have hit zero stock:';
+    var shown = list.slice(0,8);
+    var html = shown.map(function(it){
+      return '<li><strong>'+(it.itemname||'Unnamed item')+'</strong> <span class="mono">('+(it.itemcode||'—')+')</span></li>';
+    }).join('');
+    if(list.length > shown.length){
+      html += '<li>…and ' + (list.length - shown.length) + ' more</li>';
+    }
+    els.warnList.innerHTML = html;
+    els.warnOverlay.classList.add('show');
+  }
+  function closeWarn(){ els.warnOverlay.classList.remove('show'); }
+
+  // ---------- CRUD ----------
+  function openModal(id){
+    editingId = id || null;
+    els.form.reset();
+    if(id){
+      var it = items.filter(function(x){return x.id===id;})[0];
+      if(!it) return;
+      els.modalTitle.textContent = 'Edit item';
+      document.getElementById('f_itemcode').value = it.itemcode || '';
+      document.getElementById('f_itemname').value = it.itemname || '';
+      document.getElementById('f_brand').value = it.brand || '';
+      document.getElementById('f_sizeType').value = it.sizeType || '';
+      document.getElementById('f_openStock').value = it.openStock ?? '';
+      document.getElementById('f_stockBalance').value = it.stockBalance ?? '';
+      document.getElementById('f_quantity').value = it.quantity ?? '';
+      document.getElementById('f_rate').value = it.rate ?? '';
+      document.getElementById('f_price').value = it.price ?? '';
+      document.getElementById('f_stockAlert').value = it.alertOverride ? it.stockAlert : 'Auto';
+      document.getElementById('f_dateTime').value = it.dateTime ? it.dateTime.slice(0,16) : nowLocalInputValue();
+    } else {
+      els.modalTitle.textContent = 'Add item';
+      document.getElementById('f_stockAlert').value = 'Auto';
+      document.getElementById('f_dateTime').value = nowLocalInputValue();
+    }
+    els.overlay.classList.add('show');
+    document.getElementById('f_itemcode').focus();
+  }
+
+  function closeModal(){
+    els.overlay.classList.remove('show');
+    editingId = null;
+  }
+
+  function saveItem(e){
+    e.preventDefault();
+    var stockBalance = document.getElementById('f_stockBalance').value;
+    var alertChoice = document.getElementById('f_stockAlert').value;
+    var isOverride = alertChoice !== 'Auto';
+    var resolvedAlert = isOverride ? alertChoice : computeAlert(stockBalance);
+    var dt = document.getElementById('f_dateTime').value || nowLocalInputValue();
+
+    var data = {
+      itemcode: document.getElementById('f_itemcode').value.trim(),
+      itemname: document.getElementById('f_itemname').value.trim(),
+      brand: document.getElementById('f_brand').value.trim(),
+      sizeType: document.getElementById('f_sizeType').value.trim(),
+      openStock: document.getElementById('f_openStock').value,
+      stockBalance: stockBalance,
+      quantity: document.getElementById('f_quantity').value,
+      rate: document.getElementById('f_rate').value,
+      price: document.getElementById('f_price').value,
+      stockAlert: resolvedAlert,
+      alertOverride: isOverride,
+      dateTime: dt
+    };
+
+    if(!data.itemcode || !data.itemname){ toast('Item code and item name are required'); return; }
+
+    if(editingId){
+      data.id = editingId;
+      items = items.map(function(it){ return it.id===editingId ? Object.assign({},it,data) : it; });
+      toast('Item updated');
+    } else {
+      var dup = items.some(function(it){ return it.itemcode.toLowerCase()===data.itemcode.toLowerCase(); });
+      if(dup && !confirm('An item with this code already exists. Add it anyway?')) return;
+      data.id = uid();
+      items.push(data);
+      toast('Item added');
+    }
+    closeModal();
+    render();
+    afterMutation();
+    if(displayAlert(data) === 'Out of Stock') showOutOfStockWarning([data]);
+  }
+
+  function deleteItem(id){
+    var it = items.filter(function(x){return x.id===id;})[0];
+    if(!it) return;
+    if(!confirm('Delete "'+it.itemname+'" ('+it.itemcode+')? This cannot be undone.')) return;
+    items = items.filter(function(x){return x.id!==id;});
+    toast(fileHandle ? 'Item deleted — syncing to Excel file…' : 'Item deleted');
+    render();
+    afterMutation();
+  }
+
+  // called after every add/edit/delete so the linked file (if any) stays in
+  // sync AND so the local browser copy (IndexedDB) is refreshed, which is
+  // what makes a page refresh keep your data.
+  function afterMutation(){
+    persistState();
+    if(fileHandle){
+      saveToLinkedFile();
+    }
+  }
+
+  // ---------- Excel <-> items conversion ----------
+  function rowsToItems(rows){
+    return rows.map(function(row){
+      var obj = { id: uid() };
+      Object.keys(row).forEach(function(h){
+        var key = HEADER_LOOKUP[normHeader(h)];
+        if(key) obj[key] = row[h] instanceof Date ? row[h].toISOString() : row[h];
+      });
+      FIELDS.forEach(function(f){ if(obj[f.key]===undefined) obj[f.key] = ''; });
+      // Always recompute the alert from the actual stock balance on import —
+      // never trust a stale value baked into the spreadsheet. If you want a
+      // manual override, set it later via Edit item.
+      obj.stockAlert = computeAlert(obj.stockBalance);
+      obj.alertOverride = false;
+      if(!obj.itemcode && !obj.itemname) return null;
+      return obj;
+    }).filter(Boolean);
+  }
+
+  function workbookToItems(wb){
+    var sheet = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+    return rowsToItems(rows);
+  }
+
+  function buildWorkbook(){
+    var header = FIELDS.map(function(f){return f.excel;});
+    var aoa = [header].concat(items.map(function(it){
+      return FIELDS.map(function(f){
+        if(f.key === 'stockAlert') return displayAlert(it);
+        var v = it[f.key];
+        return v===undefined || v===null ? '' : v;
+      });
+    }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = FIELDS.map(function(f){ return { wch: Math.max(12, f.label.length + 2) }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    return wb;
+  }
+
+  // classic <input type=file> one-time import (used as fallback, or alongside a link)
+  function importExcel(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type:'array', cellDates:true });
+        var imported = workbookToItems(wb);
+        if(imported.length===0){ toast('No matching rows found in that file'); return; }
+        items = imported;
+        lastFileName = file.name;
+        setLastUpdated('Loaded from "' + file.name + '" · ' + new Date().toLocaleString());
+        sortKey = null;
+        render();
+        toast('Imported ' + imported.length + ' rows');
+        afterMutation();
+        var zero = items.filter(function(it){ return displayAlert(it) === 'Out of Stock'; });
+        showOutOfStockWarning(zero);
+      }catch(err){
+        console.error(err);
+        toast('Could not read that file — check it is a valid Excel/CSV file');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function exportExcel(){
+    if(items.length===0){ toast('Nothing to export yet'); return; }
+    var wb = buildWorkbook();
+    var stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    XLSX.writeFile(wb, (lastFileName ? lastFileName.replace(/\.(xlsx|xls|csv)$/i,'') : 'Inventory') + '_copy_' + stamp + '.xlsx');
+    toast('Excel copy downloaded');
+  }
+
+  // ---------- Live-linked file (File System Access API) ----------
+  async function linkExistingFile(){
+    if(!fsSupported){ toast('Your browser does not support linking local files — try Chrome or Edge'); return; }
+    try{
+      var handles = await window.showOpenFilePicker({
+        multiple:false,
+        types:[{ description:'Excel/CSV', accept:{
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'],
+          'application/vnd.ms-excel':['.xls'],
+          'text/csv':['.csv']
+        }}]
+      });
+      var handle = handles[0];
+      var file = await handle.getFile();
+      var buf = await file.arrayBuffer();
+      var wb = XLSX.read(buf, { type:'array', cellDates:true });
+      var imported = workbookToItems(wb);
+      fileHandle = handle;
+      items = imported;
+      lastFileName = file.name;
+      sortKey = null;
+      setSyncStatus(true, file.name);
+      hideReconnectBar();
+      setLastUpdated('Linked to "' + file.name + '" · ' + new Date().toLocaleString());
+      render();
+      toast('Linked — CRUD changes will auto-save to this file');
+      persistState();
+      idbSet('fileHandle', handle).catch(function(){});
+      var zero = items.filter(function(it){ return displayAlert(it) === 'Out of Stock'; });
+      showOutOfStockWarning(zero);
+    }catch(err){
+      if(err && err.name === 'AbortError') return;
+      console.error(err);
+      toast('Could not link that file: ' + (err.message || err));
+    }
+  }
+
+  async function createLinkedFile(){
+    if(!fsSupported){ toast('Your browser does not support creating linked local files — try Chrome or Edge'); return; }
+    try{
+      var handle = await window.showSaveFilePicker({
+        suggestedName:'Inventory.xlsx',
+        types:[{ description:'Excel Workbook', accept:{ 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'] } }]
+      });
+      fileHandle = handle;
+      items = [];
+      lastFileName = handle.name;
+      await saveToLinkedFile();
+      setSyncStatus(true, handle.name);
+      hideReconnectBar();
+      render();
+      toast('New linked file created — add items to populate it');
+      persistState();
+      idbSet('fileHandle', handle).catch(function(){});
+    }catch(err){
+      if(err && err.name === 'AbortError') return;
+      console.error(err);
+      toast('Could not create that file: ' + (err.message || err));
+    }
+  }
+
+  function unlinkFile(){
+    fileHandle = null;
+    setSyncStatus(false);
+    toast('Unlinked — your data keeps auto-saving in this browser, and you can still Export a copy');
+    idbSet('fileHandle', null).catch(function(){});
+    persistState();
+  }
+
+  async function saveToLinkedFile(){
+    if(!fileHandle) return;
+    try{
+      if('queryPermission' in fileHandle){
+        var perm = await fileHandle.queryPermission({ mode:'readwrite' });
+        if(perm !== 'granted'){
+          perm = await fileHandle.requestPermission({ mode:'readwrite' });
+          if(perm !== 'granted'){ toast('Write permission denied — could not auto-save'); return; }
+        }
+      }
+      var wb = buildWorkbook();
+      var out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+      var writable = await fileHandle.createWritable();
+      await writable.write(out);
+      await writable.close();
+      setLastUpdated('Auto-saved to "' + fileHandle.name + '" · ' + new Date().toLocaleString());
+    }catch(err){
+      console.error(err);
+      toast('Auto-save failed: ' + (err.message || err));
+    }
+  }
+
+  // ---------- Local persistence (IndexedDB) so a page refresh keeps your data ----------
+  // IndexedDB is used instead of localStorage because it can also store the
+  // FileSystemFileHandle object itself (localStorage can only hold strings),
+  // which is what lets us offer a one-click "Reconnect" after a refresh.
+  var DB_NAME = 'stockledgerDB', STORE = 'kv';
+  function idbOpen(){
+    return new Promise(function(resolve, reject){
+      if(!('indexedDB' in window)){ reject(new Error('IndexedDB not supported')); return; }
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function(){ req.result.createObjectStore(STORE); };
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ reject(req.error); };
+    });
+  }
+  function idbSet(key, val){
+    return idbOpen().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(val, key);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(){ reject(tx.error); };
+      });
+    });
+  }
+  function idbGet(key){
+    return idbOpen().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE, 'readonly');
+        var req = tx.objectStore(STORE).get(key);
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ reject(req.error); };
+      });
+    });
+  }
+
+  function persistState(){
+    idbSet('state', {
+      items: items,
+      lastFileName: lastFileName,
+      sortKey: sortKey,
+      sortDir: sortDir
+    }).catch(function(err){ console.error('Could not save local data', err); });
+  }
+
+  function hideReconnectBar(){
+    els.reconnectBar.classList.remove('show');
+  }
+  function showReconnectBar(name){
+    els.reconnectName.textContent = name;
+    els.reconnectBar.classList.add('show');
+  }
+
+  async function reconnectStoredFile(handle){
+    try{
+      var perm = await handle.queryPermission({ mode:'readwrite' });
+      if(perm !== 'granted'){
+        perm = await handle.requestPermission({ mode:'readwrite' }); // needs a user gesture, so this runs from the Reconnect button click
+      }
+      if(perm !== 'granted'){ toast('Permission denied — file stays unlinked'); return; }
+      var file = await handle.getFile();
+      fileHandle = handle;
+      lastFileName = file.name;
+      setSyncStatus(true, file.name);
+      hideReconnectBar();
+      setLastUpdated('Reconnected to "' + file.name + '" · ' + new Date().toLocaleString());
+      render();
+      toast('Reconnected — auto-save resumed');
+      persistState();
+    }catch(err){
+      console.error(err);
+      toast('Could not reconnect: ' + (err.message || err));
+    }
+  }
+
+  async function restoreState(){
+    try{
+      var state = await idbGet('state');
+      if(state && Array.isArray(state.items) && state.items.length){
+        items = state.items.map(function(it){
+          if(it.alertOverride === undefined) it.alertOverride = false;
+          return it;
+        });
+        lastFileName = state.lastFileName || null;
+        sortKey = state.sortKey || null;
+        sortDir = state.sortDir || 1;
+        setLastUpdated('Restored from this browser · ' + new Date().toLocaleString());
+      }
+    }catch(err){ console.error('Could not restore local data', err); }
+
+    if(fsSupported){
+      try{
+        var handle = await idbGet('fileHandle');
+        if(handle){
+          var perm = await handle.queryPermission({ mode:'readwrite' });
+          if(perm === 'granted'){
+            // Permission already granted from a previous session — reconnect silently.
+            fileHandle = handle;
+            lastFileName = handle.name;
+            setSyncStatus(true, handle.name);
+          } else {
+            // Browsers require a user gesture to (re-)grant file permission,
+            // so we can't silently re-link here — show a one-click prompt instead.
+            showReconnectBar(handle.name);
+            els._pendingHandle = handle;
+          }
+        }
+      }catch(err){ /* no stored handle, or it's stale — ignore */ }
+    }
+
+    render();
+  }
+
+  // ---------- Sample data ----------
+  function loadSample(){
+    var brands = ['Acme','Northline','Corex','Bluepeak'];
+    var sizes = ['Small','Medium','Large','Standard','—'];
+    var names = ['Desk Lamp','Ink Cartridge Black','Whiteboard Marker Set','External SSD','Wireless Mouse','HDMI Cable','Office Chair','Notebook Pack'];
+    var out = [];
+    for(var i=0;i<12;i++){
+      var bal = i===0 ? 0 : Math.floor(Math.random()*120);
+      out.push({
+        id: uid(),
+        itemcode: 'SKU-' + (1000+i),
+        itemname: names[i % names.length],
+        brand: brands[i % brands.length],
+        sizeType: sizes[i % sizes.length],
+        openStock: bal + Math.floor(Math.random()*40),
+        stockBalance: bal,
+        quantity: Math.floor(Math.random()*30),
+        rate: (Math.random()*40+5).toFixed(2),
+        price: (Math.random()*80+10).toFixed(2),
+        stockAlert: computeAlert(bal),
+        alertOverride: false,
+        dateTime: new Date(Date.now() - i*3600*1000).toISOString()
+      });
+    }
+    items = out;
+    lastFileName = null;
+    setLastUpdated('Sample data loaded · ' + new Date().toLocaleString());
+    render();
+    toast('Sample data loaded');
+    afterMutation();
+    var zero = items.filter(function(it){ return displayAlert(it) === 'Out of Stock'; });
+    showOutOfStockWarning(zero);
+  }
+
+  // ---------- Wire up ----------
+  document.getElementById('fileInput').addEventListener('change', function(e){
+    if(e.target.files[0]) importExcel(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+  document.getElementById('addBtn').addEventListener('click', function(){ openModal(null); });
+  document.getElementById('emptyAddBtn').addEventListener('click', function(){ openModal(null); });
+  document.getElementById('emptyLinkBtn').addEventListener('click', linkExistingFile);
+  document.getElementById('sampleBtn').addEventListener('click', loadSample);
+  document.getElementById('linkOpenBtn').addEventListener('click', linkExistingFile);
+  document.getElementById('linkNewBtn').addEventListener('click', createLinkedFile);
+  document.getElementById('unlinkBtn').addEventListener('click', unlinkFile);
+  document.getElementById('reconnectBtn').addEventListener('click', function(){
+    if(els._pendingHandle) reconnectStoredFile(els._pendingHandle);
+  });
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  els.overlay.addEventListener('click', function(e){ if(e.target===els.overlay) closeModal(); });
+  els.form.addEventListener('submit', saveItem);
+  els.search.addEventListener('input', render);
+  els.filterBrand.addEventListener('change', render);
+  els.filterAlert.addEventListener('change', render);
+  document.getElementById('resetFilters').addEventListener('click', function(){
+    els.search.value=''; els.filterBrand.value='All'; els.filterAlert.value='All'; render();
+  });
+  document.getElementById('warnClose').addEventListener('click', closeWarn);
+  document.getElementById('warnOk').addEventListener('click', closeWarn);
+  document.getElementById('warnFilterBtn').addEventListener('click', function(){
+    closeWarn();
+    els.filterAlert.value = 'Out of Stock';
+    render();
+  });
+  els.warnOverlay.addEventListener('click', function(e){ if(e.target===els.warnOverlay) closeWarn(); });
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    var html = document.documentElement;
+    var isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    this.querySelector('.knob').textContent = isDark ? '☀' : '☾';
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Escape') return;
+    if(els.overlay.classList.contains('show')) closeModal();
+    if(els.warnOverlay.classList.contains('show')) closeWarn();
+  });
+
+  if(!fsSupported){
+    document.getElementById('linkOpenBtn').title = 'Not supported in this browser — try Chrome or Edge';
+    document.getElementById('linkNewBtn').title = 'Not supported in this browser — try Chrome or Edge';
+  }
+  setSyncStatus(false);
+  restoreState();
+})();
+</script>
+</body>
+</html>
